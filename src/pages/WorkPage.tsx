@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { PageId, Project } from '../types';
-import { ArrowUpRight, Filter } from 'lucide-react';
+import { ArrowUpRight, Filter, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSite } from '../context/SiteContext';
 
@@ -198,12 +198,24 @@ export const WorkPage: React.FC<WorkPageProps> = ({ onNavigate, onSelectProject 
                     </div>
                   </div>
 
-                  <div className="lg:col-span-2 flex lg:justify-end items-center pt-2">
+                  <div className="lg:col-span-2 flex flex-col lg:items-end gap-3 pt-2">
+                    {project.liveUrl && (
+                      <a
+                        href={project.liveUrl.startsWith('http') ? project.liveUrl : `https://${project.liveUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-[11px] font-mono font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-md"
+                      >
+                        <span>VISIT LIVE SITE</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
                     <button
                       className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] group-hover:text-white transition-colors"
                       style={{ color: config.primaryColorLight || '#60a5fa' }}
                     >
-                      <span>VIEW CASE DOSSIER</span>
+                      <span>VIEW DOSSIER</span>
                       <ArrowUpRight className="w-4 h-4" />
                     </button>
                   </div>

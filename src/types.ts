@@ -51,6 +51,8 @@ export interface Project {
   name: string;
   client: string;
   industry: string;
+  category?: string;
+  liveUrl?: string;
   year: string;
   tagline: string;
   description: string;

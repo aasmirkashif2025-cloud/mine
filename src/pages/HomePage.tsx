@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PageId, Project } from '../types';
 import { Hero } from '../components/Hero';
-import { ArrowUpRight, ArrowRight, Sparkles, ChevronRight, CheckCircle2, ShieldCheck, Zap, Star, Quote, Award, Check, X as XIcon } from 'lucide-react';
+import { ArrowUpRight, ArrowRight, Sparkles, ChevronRight, CheckCircle2, ShieldCheck, Zap, Star, Quote, Award, Check, X as XIcon, ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useSite } from '../context/SiteContext';
 import { sound } from '../utils/audio';
@@ -364,7 +364,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject 
                       </p>
                     </div>
 
-                    <div className="flex flex-col md:items-end gap-2 shrink-0">
+                    <div className="flex flex-col md:items-end gap-2.5 shrink-0">
+                      {project.liveUrl && (
+                        <a
+                          href={project.liveUrl.startsWith('http') ? project.liveUrl : `https://${project.liveUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white border border-emerald-400/40 text-[11px] font-mono font-semibold uppercase tracking-wider backdrop-blur-md transition-all shadow-lg hover:scale-105 cursor-pointer"
+                        >
+                          <span>LIVE SITE</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         {project.services.slice(0, 3).map((service, sIdx) => (
                           <span

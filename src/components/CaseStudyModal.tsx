@@ -1,6 +1,6 @@
 import React from 'react';
 import { Project, PageId } from '../types';
-import { X as CloseIcon, ArrowRight as ArrowIcon, Layers as LayersIcon, Sparkles as SparklesIcon } from 'lucide-react';
+import { X as CloseIcon, ArrowRight as ArrowIcon, ExternalLink as ExternalLinkIcon, Layers as LayersIcon, Sparkles as SparklesIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSite } from '../context/SiteContext';
 
@@ -87,10 +87,22 @@ export const CaseStudyModal: React.FC<CaseStudyModalProps> = ({ project, onClose
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0d0f14] via-transparent to-transparent opacity-80" />
 
-              <div className="absolute bottom-4 left-4 right-4 md:bottom-6 md:left-6 flex flex-wrap items-center justify-between gap-4">
+              <div className="absolute bottom-4 left-4 right-4 md:bottom-6 md:left-6 md:right-6 flex flex-wrap items-center justify-between gap-4">
                 <div className="bg-black/60 backdrop-blur-md px-4 py-2 border border-white/10 text-xs font-mono text-white/80">
                   Client: {project.client} • {project.year}
                 </div>
+
+                {project.liveUrl && (
+                  <a
+                    href={project.liveUrl.startsWith('http') ? project.liveUrl : `https://${project.liveUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-semibold uppercase tracking-wider transition-all duration-300 shadow-xl"
+                  >
+                    <span>VISIT LIVE WEBSITE</span>
+                    <ExternalLinkIcon className="w-3.5 h-3.5" />
+                  </a>
+                )}
               </div>
             </div>
 
@@ -179,16 +191,29 @@ export const CaseStudyModal: React.FC<CaseStudyModalProps> = ({ project, onClose
 
             {/* Bottom CTA within Modal */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
-              <p className="text-xs text-white/60 font-light">
-                Ready to engineer a similar digital experience for your brand?
-              </p>
+              <div className="text-xs text-white/60 font-light flex items-center gap-2">
+                {project.liveUrl && (
+                  <a
+                    href={project.liveUrl.startsWith('http') ? project.liveUrl : `https://${project.liveUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-mono font-semibold uppercase tracking-wider transition-colors border border-white/20"
+                  >
+                    <span>Launch Live Site</span>
+                    <ExternalLinkIcon className="w-3.5 h-3.5 text-emerald-400" />
+                  </a>
+                )}
+                {!project.liveUrl && (
+                  <span>Ready to engineer a similar digital experience for your brand?</span>
+                )}
+              </div>
               <button
                 onClick={() => {
                   onClose();
                   onNavigate('contact');
                 }}
                 style={{ backgroundColor: config.primaryColor || '#2563EB' }}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 text-white text-xs font-semibold tracking-widest uppercase transition-colors shadow-lg hover:opacity-90"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 text-white text-xs font-semibold tracking-widest uppercase transition-colors shadow-lg hover:opacity-90 cursor-pointer"
               >
                 <span>INITIATE SIMILAR PROJECT</span>
                 <ArrowIcon className="w-4 h-4" />
