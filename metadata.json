@@ -1,0 +1,6 @@
+{
+  "name": "Affliora Digital",
+  "description": "Affliora Digital is an elite digital agency creating modern websites, web applications, and digital experiences that move business.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

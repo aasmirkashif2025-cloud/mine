@@ -1,0 +1,202 @@
+@import "tailwindcss";
+
+:root {
+  --font-family-display: "Syne", system-ui, -apple-system, sans-serif;
+  --font-family-body: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-family-editorial: "Cormorant Garamond", Georgia, serif;
+  --font-family-mono: "Space Mono", monospace;
+  --color-primary: #2563EB;
+  --color-primary-light: #3B82F6;
+  --color-primary-glow: rgba(37, 99, 235, 0.35);
+  --color-accent-secondary: #60A5FA;
+}
+
+@theme {
+  --font-sans: var(--font-family-body, "Plus Jakarta Sans", system-ui, -apple-system, sans-serif);
+  --font-display: var(--font-family-display, "Syne", system-ui, sans-serif);
+  --font-editorial: var(--font-family-editorial, "Cormorant Garamond", Georgia, serif);
+  --font-serif: var(--font-family-editorial, "Cormorant Garamond", Georgia, serif);
+  --font-mono: var(--font-family-mono, "Space Mono", monospace);
+}
+
+@layer base {
+  html {
+    background-color: #08090b;
+    color: #e2e4e9;
+    font-family: var(--font-family-body, "Plus Jakarta Sans", system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    font-family: var(--font-family-body, "Plus Jakarta Sans", system-ui, sans-serif);
+  }
+
+  ::selection {
+    background: rgba(59, 130, 246, 0.3);
+    color: #ffffff;
+  }
+
+  /* Custom subtle scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #08090b;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #232730;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #323846;
+  }
+}
+
+/* Modern & Editorial Typography Utilities */
+.font-display {
+  font-family: var(--font-family-display, var(--font-display));
+}
+
+.font-editorial {
+  font-family: var(--font-family-editorial, var(--font-editorial));
+}
+
+.font-sans,
+.font-sans-agency {
+  font-family: var(--font-family-body, var(--font-sans));
+}
+
+.font-mono,
+.font-mono-agency {
+  font-family: var(--font-family-mono, var(--font-mono));
+}
+
+/* Subtle line clamp & smooth mask utilities */
+.mask-radial-vignette {
+  mask-image: radial-gradient(circle at center, black 60%, transparent 100%);
+}
+
+/* Glassmorphism Aesthetics Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+}
+
+.glass-badge {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float {
+  animation: floatGentle 5s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: floatGentle 6s ease-in-out 2s infinite;
+}
+
+@keyframes marqueeInfinite {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marqueeInfinite 35s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+}
+
+.glass-pill:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Custom Smooth Follower Cursor - Full replacement of default mouse arrow */
+html.custom-cursor-active,
+html.custom-cursor-active *,
+html.custom-cursor-active *::before,
+html.custom-cursor-active *::after {
+  cursor: none !important;
+}
+
+/* Allow text inputs to display standard text editing caret */
+html.custom-cursor-active input[type="text"],
+html.custom-cursor-active input[type="email"],
+html.custom-cursor-active input[type="password"],
+html.custom-cursor-active input[type="search"],
+html.custom-cursor-active input[type="tel"],
+html.custom-cursor-active input[type="url"],
+html.custom-cursor-active input[type="number"],
+html.custom-cursor-active textarea {
+  cursor: text !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html,
+  body,
+  *,
+  *::before,
+  *::after {
+    cursor: none !important;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  textarea {
+    cursor: text !important;
+  }
+}
+
