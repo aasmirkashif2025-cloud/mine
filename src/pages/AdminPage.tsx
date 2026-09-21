@@ -782,11 +782,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                   {config.name}
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  LIVE CMS ACTIVE
+                  FIREBASE CLOUD PERSISTENCE ACTIVE
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-white/40">
-                Connected to Full-Stack API & Persistent Database
+              <span className="text-[10px] font-mono text-white/50 flex items-center gap-1.5 mt-0.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Global Cloud Sync Active — Any changes made here are instantly live across all devices & tabs
               </span>
             </div>
           </div>

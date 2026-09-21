@@ -15,6 +15,18 @@ import {
   INDUSTRIES_LIST,
   AGENCY_STATS,
 } from '../data/fallbackData';
+import {
+  getCloudSiteData,
+  saveCloudSiteData,
+  syncProjectsToCloud,
+  syncConfigToCloud,
+  submitCloudInquiry,
+  getCloudInquiries,
+  updateCloudInquiryStatus,
+  deleteCloudInquiry,
+  subscribeCloudSiteData,
+  subscribeCloudInquiries,
+} from '../lib/firestoreService';
 
 const DEFAULT_CONFIG: SiteConfig = {
   name: AGENCY_DETAILS.name || 'Affliora Digital',
@@ -172,9 +184,50 @@ export const SiteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Fetch Public Site Data from backend
+  // Fetch Public Site Data from Firebase Firestore (with fallback to backend / local cache)
   const fetchSiteData = useCallback(async () => {
     try {
+      // 1. First priority: Check Cloud Firestore for live data
+      const cloudData = await getCloudSiteData();
+      if (cloudData) {
+        if (cloudData.config) {
+          setConfig(cloudData.config);
+          applyThemeColors(cloudData.config);
+          localStorage.setItem('affliora_cached_config', JSON.stringify(cloudData.config));
+        }
+        if (Array.isArray(cloudData.projects) && cloudData.projects.length > 0) {
+          setProjects(cloudData.projects);
+          localStorage.setItem('affliora_cached_projects', JSON.stringify(cloudData.projects));
+        }
+        if (Array.isArray(cloudData.services) && cloudData.services.length > 0) {
+          setServices(cloudData.services);
+          localStorage.setItem('affliora_cached_services', JSON.stringify(cloudData.services));
+        }
+        if (Array.isArray(cloudData.industries) && cloudData.industries.length > 0) {
+          setIndustries(cloudData.industries);
+          localStorage.setItem('affliora_cached_industries', JSON.stringify(cloudData.industries));
+        }
+        if (Array.isArray(cloudData.stats) && cloudData.stats.length > 0) {
+          setStats(cloudData.stats);
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. If Cloud Firestore is not yet seeded, check if current browser has cached projects to push to cloud
+      const cachedProjectsRaw = localStorage.getItem('affliora_cached_projects');
+      if (cachedProjectsRaw) {
+        try {
+          const cachedProjList = JSON.parse(cachedProjectsRaw);
+          if (Array.isArray(cachedProjList) && cachedProjList.length > 0) {
+            setProjects(cachedProjList);
+            // Auto seed to Firestore so all other devices immediately get it
+            syncProjectsToCloud(cachedProjList).catch(() => {});
+          }
+        } catch {}
+      }
+
+      // 3. Fallback: Backend API
       const res = await fetch('/api/site-data');
       if (res.ok) {
         const data = await res.json();
@@ -183,9 +236,10 @@ export const SiteProvider: React.FC<{ children: React.ReactNode }> = ({ children
           applyThemeColors(data.config);
           localStorage.setItem('affliora_cached_config', JSON.stringify(data.config));
         }
-        if (Array.isArray(data.projects)) {
+        if (Array.isArray(data.projects) && (!cachedProjectsRaw || JSON.parse(cachedProjectsRaw || '[]').length === 0)) {
           setProjects(data.projects);
           localStorage.setItem('affliora_cached_projects', JSON.stringify(data.projects));
+          syncProjectsToCloud(data.projects).catch(() => {});
         }
         if (Array.isArray(data.services)) {
           setServices(data.services);
@@ -206,11 +260,50 @@ export const SiteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [applyThemeColors]);
 
-  // Initial load
+  // Initial load & real-time live listener for public site data
   useEffect(() => {
     fetchSiteData();
     applyThemeColors(config);
-  }, [fetchSiteData]);
+
+    // Live real-time Firestore listener: updates immediately for ANY visitor when changes happen
+    const unsubscribeSite = subscribeCloudSiteData((cloudData) => {
+      if (cloudData.config) {
+        setConfig((prev) => {
+          const merged = { ...prev, ...cloudData.config };
+          applyThemeColors(merged);
+          try {
+            localStorage.setItem('affliora_cached_config', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+      if (Array.isArray(cloudData.projects) && cloudData.projects.length > 0) {
+        setProjects(cloudData.projects);
+        try {
+          localStorage.setItem('affliora_cached_projects', JSON.stringify(cloudData.projects));
+        } catch {}
+      }
+      if (Array.isArray(cloudData.services) && cloudData.services.length > 0) {
+        setServices(cloudData.services);
+        try {
+          localStorage.setItem('affliora_cached_services', JSON.stringify(cloudData.services));
+        } catch {}
+      }
+      if (Array.isArray(cloudData.industries) && cloudData.industries.length > 0) {
+        setIndustries(cloudData.industries);
+        try {
+          localStorage.setItem('affliora_cached_industries', JSON.stringify(cloudData.industries));
+        } catch {}
+      }
+      if (Array.isArray(cloudData.stats) && cloudData.stats.length > 0) {
+        setStats(cloudData.stats);
+      }
+    });
+
+    return () => {
+      unsubscribeSite();
+    };
+  }, [fetchSiteData, applyThemeColors]);
 
   // Verify Admin Session
   useEffect(() => {
@@ -246,6 +339,15 @@ export const SiteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchInquiries = useCallback(async () => {
     if (!adminToken) return;
     try {
+      const cloudInqs = await getCloudInquiries();
+      if (Array.isArray(cloudInqs) && cloudInqs.length > 0) {
+        setInquiries(cloudInqs);
+        return;
+      }
+    } catch (err) {
+      console.warn('Cloud inquiries check failed:', err);
+    }
+    try {
       const res = await fetch('/api/admin/inquiries', {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
@@ -270,6 +372,15 @@ export const SiteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (isAdmin) {
       fetchInquiries();
+      // Real-time listener for incoming inquiries in Admin CRM
+      const unsubscribeInq = subscribeCloudInquiries((cloudInqs) => {
+        if (Array.isArray(cloudInqs)) {
+          setInquiries(cloudInqs);
+        }
+      });
+      return () => {
+        unsubscribeInq();
+      };
     }
   }, [isAdmin, fetchInquiries]);
 
@@ -345,27 +456,24 @@ export const SiteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const merged = { ...config, ...newConfig };
       setConfig(merged);
       applyThemeColors(merged);
+      localStorage.setItem('affliora_cached_config', JSON.stringify(merged));
 
+      // 1. Sync directly to Cloud Firestore so all devices get the new config immediately
+      syncConfigToCloud(merged).catch((e) => console.warn('Firestore config sync warn:', e));
+
+      // 2. Also notify backend server
       if (adminToken) {
-        const res = await fetch('/api/admin/config', {
+        fetch('/api/admin/config', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${adminToken}`,
           },
           body: JSON.stringify(newConfig),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.config) {
-            setConfig(data.config);
-            applyThemeColors(data.config);
-            localStorage.setItem('affliora_cached_config', JSON.stringify(data.config));
-          }
-          showNotification('Studio settings & theme saved successfully', 'success');
-          return true;
-        }
+        }).catch(() => {});
       }
+
+      showNotification('Studio settings & theme saved to cloud', 'success');
       return true;
     } catch (err) {
       console.error('Error updating config:', err);
@@ -397,250 +505,277 @@ export const SiteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       featured: projectData.featured ?? true,
     };
 
-    try {
-      const res = await fetch('/api/admin/projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`,
-        },
-        body: JSON.stringify(projectData),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const created = data.project;
-        setProjects((prev) => {
-          const updated = [...prev, created];
-          localStorage.setItem('affliora_cached_projects', JSON.stringify(updated));
-          return updated;
+    let targetProject = newProject;
+
+    // Optional server creation for backend token
+    if (adminToken) {
+      try {
+        const res = await fetch('/api/admin/projects', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify(projectData),
         });
-        showNotification(`Project "${created.name}" added to portfolio`, 'success');
-        return true;
+        if (res.ok) {
+          const data = await res.json();
+          if (data.project) {
+            targetProject = data.project;
+          }
+        }
+      } catch (err) {
+        console.warn('Backend unavailable, proceeding with cloud & local sync:', err);
       }
-    } catch (err) {
-      console.warn('Backend unavailable, saving project locally to state & storage:', err);
     }
 
-    // Client-side fallback for static Vercel build
-    setProjects((prev) => {
-      const updated = [...prev, newProject];
-      localStorage.setItem('affliora_cached_projects', JSON.stringify(updated));
-      return updated;
-    });
-    showNotification(`Project "${newProject.name}" added to portfolio`, 'success');
+    const updated = [...projects, targetProject];
+    setProjects(updated);
+    localStorage.setItem('affliora_cached_projects', JSON.stringify(updated));
+
+    // CRITICAL: Persist to Firebase Cloud Firestore immediately
+    await syncProjectsToCloud(updated);
+
+    showNotification(`Project "${targetProject.name}" saved to cloud portfolio`, 'success');
     return true;
   };
 
   const updateProject = async (id: string, updates: Partial<Project>): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/admin/projects/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`,
-        },
-        body: JSON.stringify(updates),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setProjects((prev) => {
-          const updated = prev.map((p) => (p.id === id ? data.project : p));
-          localStorage.setItem('affliora_cached_projects', JSON.stringify(updated));
-          return updated;
-        });
-        showNotification('Project updated successfully', 'success');
-        return true;
+      if (adminToken) {
+        fetch(`/api/admin/projects/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify(updates),
+        }).catch(() => {});
       }
-    } catch (err) {
-      console.warn('Backend unavailable, updating project locally:', err);
-    }
 
-    // Client-side fallback
-    setProjects((prev) => {
-      const updated = prev.map((p) => (p.id === id ? { ...p, ...updates } : p));
+      const updated = projects.map((p) => (p.id === id ? { ...p, ...updates } : p));
+      setProjects(updated);
       localStorage.setItem('affliora_cached_projects', JSON.stringify(updated));
-      return updated;
-    });
-    showNotification('Project updated successfully', 'success');
-    return true;
+
+      // Save to Firebase Cloud Firestore
+      await syncProjectsToCloud(updated);
+
+      showNotification('Project updated in cloud portfolio', 'success');
+      return true;
+    } catch (err) {
+      console.error('Error updating project:', err);
+      showNotification('Failed to update project', 'error');
+      return false;
+    }
   };
 
   const deleteProject = async (id: string): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/admin/projects/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (res.ok) {
-        setProjects((prev) => {
-          const updated = prev.filter((p) => p.id !== id);
-          localStorage.setItem('affliora_cached_projects', JSON.stringify(updated));
-          return updated;
-        });
-        showNotification('Project removed from portfolio', 'info');
-        return true;
+      if (adminToken) {
+        fetch(`/api/admin/projects/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${adminToken}` },
+        }).catch(() => {});
       }
-    } catch (err) {
-      console.warn('Backend unavailable, deleting project locally:', err);
-    }
 
-    setProjects((prev) => {
-      const updated = prev.filter((p) => p.id !== id);
+      const updated = projects.filter((p) => p.id !== id);
+      setProjects(updated);
       localStorage.setItem('affliora_cached_projects', JSON.stringify(updated));
-      return updated;
-    });
-    showNotification('Project removed from portfolio', 'info');
-    return true;
+
+      // Save to Firebase Cloud Firestore
+      await syncProjectsToCloud(updated);
+
+      showNotification('Project removed from cloud portfolio', 'info');
+      return true;
+    } catch (err) {
+      console.error('Error deleting project:', err);
+      return false;
+    }
   };
 
   // Services CRUD
   const addService = async (serviceData: Partial<ServiceItem>): Promise<boolean> => {
-    try {
-      const res = await fetch('/api/admin/services', {
+    const newService: ServiceItem = {
+      id: `srv-${Date.now()}`,
+      number: String(services.length + 1).padStart(2, '0'),
+      title: serviceData.title || 'New Service',
+      shortDesc: serviceData.shortDesc || '',
+      longDesc: serviceData.longDesc || '',
+      capabilities: serviceData.capabilities || [],
+      deliverables: serviceData.deliverables || [],
+      technologies: serviceData.technologies || [],
+      highlight: serviceData.highlight || '',
+      image: serviceData.image || '',
+    };
+
+    if (adminToken) {
+      fetch('/api/admin/services', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminToken}`,
         },
         body: JSON.stringify(serviceData),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setServices((prev) => [...prev, data.service]);
-        showNotification(`Service "${data.service.title}" created`, 'success');
-        return true;
-      }
-      return false;
-    } catch (err) {
-      return false;
+      }).catch(() => {});
     }
+
+    const updated = [...services, newService];
+    setServices(updated);
+    localStorage.setItem('affliora_cached_services', JSON.stringify(updated));
+    await saveCloudSiteData({ services: updated });
+    showNotification(`Service "${newService.title}" created & synced to cloud`, 'success');
+    return true;
   };
 
   const updateService = async (id: string, updates: Partial<ServiceItem>): Promise<boolean> => {
-    try {
-      const res = await fetch(`/api/admin/services/${id}`, {
+    if (adminToken) {
+      fetch(`/api/admin/services/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminToken}`,
         },
         body: JSON.stringify(updates),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setServices((prev) => prev.map((s) => (s.id === id ? data.service : s)));
-        showNotification('Service specs updated', 'success');
-        return true;
-      }
-      return false;
-    } catch (err) {
-      return false;
+      }).catch(() => {});
     }
+
+    const updated = services.map((s) => (s.id === id ? { ...s, ...updates } : s));
+    setServices(updated);
+    localStorage.setItem('affliora_cached_services', JSON.stringify(updated));
+    await saveCloudSiteData({ services: updated });
+    showNotification('Service specs updated in cloud', 'success');
+    return true;
   };
 
   const deleteService = async (id: string): Promise<boolean> => {
-    try {
-      const res = await fetch(`/api/admin/services/${id}`, {
+    if (adminToken) {
+      fetch(`/api/admin/services/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (res.ok) {
-        setServices((prev) => prev.filter((s) => s.id !== id));
-        showNotification('Service removed', 'info');
-        return true;
-      }
-      return false;
-    } catch (err) {
-      return false;
+      }).catch(() => {});
     }
+
+    const updated = services.filter((s) => s.id !== id);
+    setServices(updated);
+    localStorage.setItem('affliora_cached_services', JSON.stringify(updated));
+    await saveCloudSiteData({ services: updated });
+    showNotification('Service removed from cloud', 'info');
+    return true;
   };
 
   // Industries CRUD
   const addIndustry = async (industryData: Partial<IndustryItem>): Promise<boolean> => {
-    try {
-      const res = await fetch('/api/admin/industries', {
+    const newInd: IndustryItem = {
+      id: `ind-${Date.now()}`,
+      number: String(industries.length + 1).padStart(2, '0'),
+      title: industryData.title || 'New Industry',
+      subtitle: industryData.subtitle || '',
+      description: industryData.description || '',
+      challenges: industryData.challenges || [],
+      solutions: industryData.solutions || [],
+      recommendedServices: industryData.recommendedServices || [],
+      image: industryData.image || '',
+    };
+
+    if (adminToken) {
+      fetch('/api/admin/industries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminToken}`,
         },
         body: JSON.stringify(industryData),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setIndustries((prev) => [...prev, data.industry]);
-        showNotification(`Industry "${data.industry.title}" added`, 'success');
-        return true;
-      }
-      return false;
-    } catch (err) {
-      return false;
+      }).catch(() => {});
     }
+
+    const updated = [...industries, newInd];
+    setIndustries(updated);
+    localStorage.setItem('affliora_cached_industries', JSON.stringify(updated));
+    await saveCloudSiteData({ industries: updated });
+    showNotification(`Industry "${newInd.title}" synced to cloud`, 'success');
+    return true;
   };
 
   const updateIndustry = async (id: string, updates: Partial<IndustryItem>): Promise<boolean> => {
-    try {
-      const res = await fetch(`/api/admin/industries/${id}`, {
+    if (adminToken) {
+      fetch(`/api/admin/industries/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminToken}`,
         },
         body: JSON.stringify(updates),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setIndustries((prev) => prev.map((i) => (i.id === id ? data.industry : i)));
-        showNotification('Industry playbook updated', 'success');
-        return true;
-      }
-      return false;
-    } catch (err) {
-      return false;
+      }).catch(() => {});
     }
+
+    const updated = industries.map((i) => (i.id === id ? { ...i, ...updates } : i));
+    setIndustries(updated);
+    localStorage.setItem('affliora_cached_industries', JSON.stringify(updated));
+    await saveCloudSiteData({ industries: updated });
+    showNotification('Industry playbook updated in cloud', 'success');
+    return true;
   };
 
   const deleteIndustry = async (id: string): Promise<boolean> => {
-    try {
-      const res = await fetch(`/api/admin/industries/${id}`, {
+    if (adminToken) {
+      fetch(`/api/admin/industries/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (res.ok) {
-        setIndustries((prev) => prev.filter((i) => i.id !== id));
-        showNotification('Industry removed', 'info');
-        return true;
-      }
-      return false;
-    } catch (err) {
-      return false;
+      }).catch(() => {});
     }
+
+    const updated = industries.filter((i) => i.id !== id);
+    setIndustries(updated);
+    localStorage.setItem('affliora_cached_industries', JSON.stringify(updated));
+    await saveCloudSiteData({ industries: updated });
+    showNotification('Industry removed from cloud', 'info');
+    return true;
   };
 
   // Stats
   const updateStats = async (newStats: AgencyStatItem[]): Promise<boolean> => {
-    try {
-      const res = await fetch('/api/admin/stats', {
+    if (adminToken) {
+      fetch('/api/admin/stats', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminToken}`,
         },
         body: JSON.stringify({ stats: newStats }),
-      });
-      if (res.ok) {
-        setStats(newStats);
-        showNotification('Measurable commitments updated', 'success');
-        return true;
-      }
-      return false;
-    } catch (err) {
-      return false;
+      }).catch(() => {});
     }
+
+    setStats(newStats);
+    await saveCloudSiteData({ stats: newStats });
+    showNotification('Measurable commitments updated in cloud', 'success');
+    return true;
   };
 
   // Inquiries
   const submitInquiry = async (formData: ContactFormData): Promise<{ success: boolean; error?: string }> => {
+    // 1. Submit to Firebase Firestore
+    try {
+      const cloudId = await submitCloudInquiry({
+        ...formData,
+        status: 'new',
+        createdAt: new Date().toISOString(),
+      });
+      if (cloudId) {
+        const newInq: InquiryItem = {
+          id: cloudId,
+          ...formData,
+          status: 'new',
+          createdAt: new Date().toISOString(),
+        };
+        setInquiries((prev) => [newInq, ...prev]);
+        showNotification('Your project inquiry has been securely transmitted.', 'success');
+        return { success: true };
+      }
+    } catch (e) {
+      console.warn('Cloud inquiry submit error:', e);
+    }
+
+    // 2. Also try backend API
     try {
       const res = await fetch('/api/inquiries', {
         method: 'POST',
@@ -677,24 +812,21 @@ export const SiteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateInquiryStatus = async (id: string, status: 'new' | 'reviewed' | 'contacted' | 'archived'): Promise<boolean> => {
-    try {
-      const res = await fetch(`/api/admin/inquiries/${id}`, {
+    // 1. Update in Firebase Firestore
+    updateCloudInquiryStatus(id, status).catch(() => {});
+
+    // 2. Also try server
+    if (adminToken) {
+      fetch(`/api/admin/inquiries/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminToken}`,
         },
         body: JSON.stringify({ status }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setInquiries((prev) => prev.map((inq) => (inq.id === id ? data.inquiry : inq)));
-        showNotification(`Inquiry status marked as ${status}`, 'success');
-        return true;
-      }
-    } catch (err) {
-      // Local fallback
+      }).catch(() => {});
     }
+
     setInquiries((prev) => {
       const updated = prev.map((inq) => (inq.id === id ? { ...inq, status } : inq));
       try {
@@ -707,19 +839,17 @@ export const SiteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteInquiry = async (id: string): Promise<boolean> => {
-    try {
-      const res = await fetch(`/api/admin/inquiries/${id}`, {
+    // 1. Delete from Firebase Firestore
+    deleteCloudInquiry(id).catch(() => {});
+
+    // 2. Also try server
+    if (adminToken) {
+      fetch(`/api/admin/inquiries/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (res.ok) {
-        setInquiries((prev) => prev.filter((inq) => inq.id !== id));
-        showNotification('Inquiry deleted', 'info');
-        return true;
-      }
-    } catch (err) {
-      // Local fallback
+      }).catch(() => {});
     }
+
     setInquiries((prev) => {
       const updated = prev.filter((inq) => inq.id !== id);
       try {

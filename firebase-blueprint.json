@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "SiteData": {
+      "collection": "site_data",
+      "description": "Global studio configuration and public content including projects, services, and branding",
+      "fields": {
+        "projects": { "type": "array", "description": "List of portfolio projects" },
+        "config": { "type": "map", "description": "Studio configuration and theme settings" },
+        "services": { "type": "array", "description": "Services list" },
+        "industries": { "type": "array", "description": "Industries list" },
+        "stats": { "type": "array", "description": "Agency metric stats" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      }
+    },
+    "Inquiry": {
+      "collection": "inquiries",
+      "description": "Client contact submissions",
+      "fields": {
+        "name": { "type": "string", "description": "Client name" },
+        "email": { "type": "string", "description": "Client email" },
+        "phone": { "type": "string", "description": "Client phone number" },
+        "company": { "type": "string", "description": "Client company" },
+        "projectType": { "type": "string", "description": "Type of project requested" },
+        "budget": { "type": "string", "description": "Budget tier" },
+        "timeline": { "type": "string", "description": "Project timeline" },
+        "message": { "type": "string", "description": "Inquiry details" },
+        "status": { "type": "string", "description": "new, reviewed, contacted, or archived" },
+        "createdAt": { "type": "string", "description": "Timestamp" }
+      }
+    }
+  }
+}

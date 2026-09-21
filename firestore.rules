@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public site data: readable by anyone on any device, editable by anyone using the app/admin
+    match /site_data/{docId} {
+      allow read, write: if true;
+    }
+    
+    // Inquiries: anyone can submit, anyone can read in admin
+    match /inquiries/{inquiryId} {
+      allow read, write: if true;
+    }
+
+    // Default fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
